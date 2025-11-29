@@ -1,6 +1,5 @@
 // Logica.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
-
 #include <iostream>
 #include <io.h>     // Necessário para _setmode
 #include <fcntl.h>  // Necessário para _O_U16TEXT
@@ -12,11 +11,11 @@
 enum EConectivo {
     ENADA = 0,
     ENAO = 1,
+    ETODO = 5,   
+    EALGUM = 6,  
     EIMPLICA = 2,
     EOU = 3,
     EE = 4,
-
-
 };
 
 bool ChecaValidez(std::wstring expression, std::wstring* erro);
@@ -26,7 +25,8 @@ std::vector <std::wstring> AplicarRegra(std::wstring expressao, int regra);
 void ResolverGalho(std::vector <std::wstring>* galho, std::vector <std::vector <std::wstring>>* arvore);
 int TirarColchetesFora(std::wstring* expressao);
 EConectivo ParsearExpressao(std::wstring expressao, int* indice);
-bool ResolverExpressao(std::wstring expressao, int indice, EConectivo conectivo, std::vector <std::wstring> *galho, std::vector <std::vector <std::wstring>> * arvore);
+bool ResolverExpressao(std::wstring expressao, int indice, EConectivo conectivo, std::vector <std::wstring>* galho, std::vector <std::vector <std::wstring>>* arvore);
+std::wstring SubstituirVariavel(std::wstring expressao, wchar_t variavel, wchar_t constante);
 
 enum eEstadoAtual {
     ESTEP1,
@@ -35,7 +35,7 @@ enum eEstadoAtual {
     ESTEP4,
 };
 
-int main(){
+int main() {
 
 
     _setmode(_fileno(stdout), _O_U16TEXT);
@@ -45,8 +45,10 @@ int main(){
     std::wcout << "~(Expressão) = Não (Expressão)\n";
     std::wcout << "(A > B) = A implica B\n";
     std::wcout << "(A v B) = A ou B\n";
-    std::wcout << "(A ^ B) = A e B\n\n";
-    
+    std::wcout << "(A ^ B) = A e B\n";
+    std::wcout << "@A(Expressão) = Para Todo A (Expressão)\n";
+    std::wcout << "#A(Expressão) = Existe um A (Expressão)\n\n";
+
 
     std::wstring expression;
 
@@ -61,23 +63,11 @@ int main(){
 
         do {
 
-           
+
 
             std::wcout << "\nDigite as expressões do BD (vazio para continuar):\n";
             expressionNoSpaces.clear();
             expressionNoSpaces = LerExpressao();
-
-            /*  std::getline(std::wcin, expression);
-              std::wcout << expression.c_str() << " " << expression.size() << std::endl;
-
-              for (int i = 0; i < expression.size(); i++) {
-                  if (expression[i] != ' ') {
-                      expressionNoSpaces += expression[i];
-                  }
-              }
-
-              std::wcout << expressionNoSpaces.c_str() << " " << expressionNoSpaces.size() << std::endl;
-              */
             std::wstring erro = L"";
             std::wstring* erroPtr = &erro;
 
@@ -122,27 +112,21 @@ int main(){
 
 
 
-        //std::vector <std::wstring> regraAplicada = AplicarRegra(pergunta, 6);
-
-
-
-        //for (int i = 0; i < regraAplicada.size(); i++) {
-        //    for (int k = 0; k < vBD.size(); k++) {
-        //        std::wcout << regraAplicada[i].c_str() << " " << std::endl;
-
-        //    }
-
-        //}
-
-
 
         IsTautologia(vBD, pergunta);
     } while (true);
-       
+
 }
 
-
-
+std::wstring SubstituirVariavel(std::wstring expressao, wchar_t variavel, wchar_t constante) {
+    std::wstring nova = expressao;
+    for (int i = 0; i < nova.size(); i++) {
+        if (nova[i] == variavel) {
+            nova[i] = constante;
+        }
+    }
+    return nova;
+}
 
 
 std::wstring LerExpressao() {
@@ -167,91 +151,114 @@ bool ChecaValidez(std::wstring expression, std::wstring* erro) {
     // A -Z >= 65  <= 90
     //  ~ == 126  
     //  v ^ > == 118  == 94 == 94  == 62
+    //  @ == 64 (Para todo)
+    //  # == 35 (Existe)
     if (expression.size() == 0) {
         return false;
     }
 
     for (int i = 0; i < expression.size(); i++) {
         switch (step) {
-            //   (  A-Z  ~
-            case ESTEP1:
+            //   (  A-Z  ~  @  #
+        case ESTEP1:
 
-                if (expression[i] == '(') {
-                    colchetesAbertos++;
-                }
-                else if (expression[i] >= 65 && expression[i] <= 90) {
-                    step = ESTEP2;
-                }
-                else if (expression[i] == 126) {
+            if (expression[i] == '(') {
+                colchetesAbertos++;
+            }
+            else if (expression[i] >= 65 && expression[i] <= 90) {
+                step = ESTEP2;
+            }
+            else if (expression[i] == 126) {
+                step = ESTEP3;
+            }
+
+            else if (expression[i] == L'@' || expression[i] == L'#') {
+                if (i + 1 < expression.size() && expression[i + 1] >= 65 && expression[i + 1] <= 90) {
+                    i++; 
                     step = ESTEP3;
                 }
                 else {
-                    *erro = std::wstring(L"Formato incorreto! Erro em (") + expression[i] + L")";
+                    *erro = std::wstring(L"Quantificador sem variável válida!");
                     return false;
                 }
-                break;
+            }
+            else {
+                *erro = std::wstring(L"Formato incorreto! Erro em (") + expression[i] + L")";
+                return false;
+            }
+            break;
 
-                //  ) v ^ > 
-            case ESTEP2:
-                if (expression[i] == ')') {
-                    if (colchetesAbertos > 0) {
-                        colchetesAbertos--;
-                        step = ESTEP4;
-                    }
-                    else {
-                        *erro = std::wstring(L"Formato incorreto! Fechando colchete não aberto!");
-                    }
-                }
-
-                else if (expression[i] == 118 || expression[i] == 94 || expression[i] == 62) {
-                    step = ESTEP3;
-                }
-                else {
-                    *erro = std::wstring(L"Operador esperado, encontrado (") + expression[expression.size() - 1] + L")";
-                    return false;
-                }
-
-                break;
-                // ( A-Z ~
-            case ESTEP3:
-                if (expression[i] == '(') {
-                    step = ESTEP1;
-                    colchetesAbertos++;
-                }
-                else if (expression[i] == 126) {
-                    //step = ESTEP3;
-                }
-                else if (expression[i] >= 65 && expression[i] <= 90) {
+            //  ) v ^ > 
+        case ESTEP2:
+            if (expression[i] == ')') {
+                if (colchetesAbertos > 0) {
+                    colchetesAbertos--;
                     step = ESTEP4;
                 }
                 else {
-                    *erro = std::wstring(L"Formato incorreto! Erro em (") + expression[i] + L")";
-                    return false;
+                    *erro = std::wstring(L"Formato incorreto! Fechando colchete não aberto!");
                 }
+            }
 
-                break;
+            else if (expression[i] == 118 || expression[i] == 94 || expression[i] == 62) {
+                step = ESTEP3;
+            }
+            else {
+                *erro = std::wstring(L"Operador esperado, encontrado (") + expression[expression.size() - 1] + L")";
+                return false;
+            }
 
-                //  )  v ^ > 
-            case ESTEP4:
+            break;
+            // ( A-Z ~ @ #
+        case ESTEP3:
+            if (expression[i] == '(') {
+                step = ESTEP1;
+                colchetesAbertos++;
+            }
+            else if (expression[i] == 126) {
+                //step = ESTEP3;
+            }
 
-                if (expression[i] == ')') {
-                    if (colchetesAbertos > 0) {
-                        colchetesAbertos--;
-                    }
-                    else {
-                        *erro = std::wstring(L"Formato incorreto! Fechando colchete não aberto!");
-                        return false;
-                    }
-                }
-                else if (expression[i] == 118 || expression[i] == 94 || expression[i] == 62) {
-                    step = ESTEP3;
+            else if (expression[i] == L'@' || expression[i] == L'#') {
+                if (i + 1 < expression.size() && expression[i + 1] >= 65 && expression[i + 1] <= 90) {
+                    i++; 
                 }
                 else {
-                    *erro = std::wstring(L"Formato incorreto! Erro em (") + expression[i] + L")";
+                    *erro = std::wstring(L"Quantificador sem variável válida!");
                     return false;
                 }
+            }
+            else if (expression[i] >= 65 && expression[i] <= 90) {
+                step = ESTEP4;
+            }
+            else {
+                *erro = std::wstring(L"Formato incorreto! Erro em (") + expression[i] + L")";
+                return false;
+            }
 
-                break;
+            break;
+
+            //  )  v ^ > 
+        case ESTEP4:
+
+            if (expression[i] == ')') {
+                if (colchetesAbertos > 0) {
+                    colchetesAbertos--;
+                }
+                else {
+                    *erro = std::wstring(L"Formato incorreto! Fechando colchete não aberto!");
+                    return false;
+                }
+            }
+            else if (expression[i] == 118 || expression[i] == 94 || expression[i] == 62) {
+                step = ESTEP3;
+            }
+            else {
+                *erro = std::wstring(L"Formato incorreto! Erro em (") + expression[i] + L")";
+                return false;
+            }
+
+            break;
 
 
 
@@ -262,7 +269,7 @@ bool ChecaValidez(std::wstring expression, std::wstring* erro) {
     }
 
     if (colchetesAbertos == 0) {
-       // std::wcout << "Step:       " << step << std::endl;
+        // std::wcout << "Step:        " << step << std::endl;
         if (step == ESTEP2 && expression.size() != 1) {
             *erro = std::wstring(L"Operador esperado, encontrado (") + expression[expression.size() - 1] + L")";
             return false;
@@ -271,7 +278,7 @@ bool ChecaValidez(std::wstring expression, std::wstring* erro) {
             *erro = std::wstring(L"Formato incorreto! Erro em (") + expression[expression.size() - 1] + L")";
             return false;
         }
-            return true;
+        return true;
     }
     else {
         *erro = std::wstring(L"Formato incorreto! Erro em ") + std::to_wstring(colchetesAbertos) + L" colchetes não fechados.";
@@ -308,7 +315,7 @@ bool IsTautologia(std::vector <std::wstring> vBD, std::wstring pergunta) {
         for (int a = 0; ; ) {
             bool galhoResolvido = false;
 
-            std::wcout << std::endl <<  "Galho atual:  " << a + 1 << std::endl;
+            std::wcout << std::endl << "Galho atual:  " << a + 1 << std::endl;
             while (!galhoResolvido) {
                 galhoResolvido = true;
 
@@ -333,7 +340,7 @@ bool IsTautologia(std::vector <std::wstring> vBD, std::wstring pergunta) {
 
             a++;
             if (a >= arvore.size()) {
-                    break;
+                break;
             }
 
         }
@@ -373,7 +380,7 @@ bool IsTautologia(std::vector <std::wstring> vBD, std::wstring pergunta) {
     return true;
 }
 
-EConectivo ParsearExpressao(std::wstring expressao, int *indice) {
+EConectivo ParsearExpressao(std::wstring expressao, int* indice) {
 
     indice += TirarColchetesFora(&expressao);
 
@@ -397,6 +404,20 @@ EConectivo ParsearExpressao(std::wstring expressao, int *indice) {
                 }
 
             }
+
+            else if (expressao[i] == L'@') {
+                if (conectivo == ENADA) {
+                    conectivo = ETODO;
+                    *indice = i;
+                }
+            }
+
+            else if (expressao[i] == L'#') {
+                if (conectivo == ENADA) {
+                    conectivo = EALGUM;
+                    *indice = i;
+                }
+            }
             else if (expressao[i] == L'>') {
                 if (conectivo <= EIMPLICA) {
                     conectivo = EIMPLICA;
@@ -411,8 +432,8 @@ EConectivo ParsearExpressao(std::wstring expressao, int *indice) {
 
             }
             else if (expressao[i] == L'^') {
-                    conectivo = EE;
-                    *indice = i;
+                conectivo = EE;
+                *indice = i;
 
             }
 
@@ -426,7 +447,7 @@ EConectivo ParsearExpressao(std::wstring expressao, int *indice) {
 
 }
 
-bool ResolverExpressao(std::wstring expressao, int indice, EConectivo conectivo, std::vector <std::wstring> *galho, std::vector <std::vector <std::wstring>> *arvore) {
+bool ResolverExpressao(std::wstring expressao, int indice, EConectivo conectivo, std::vector <std::wstring>* galho, std::vector <std::vector <std::wstring>>* arvore) {
 
     std::wstring expressaoFinal;
     std::vector  <std::wstring> expressaoARemover;
@@ -435,142 +456,196 @@ bool ResolverExpressao(std::wstring expressao, int indice, EConectivo conectivo,
 
 
     switch (conectivo) {
-        case ENAO: {
-            std::wstring subExpressao;
+    case ENAO: {
+        std::wstring subExpressao;
 
-            for (int i = indice + 1; i < expressao.size(); i++) {
-                subExpressao += expressao[i];
+        for (int i = indice + 1; i < expressao.size(); i++) {
+            subExpressao += expressao[i];
 
-            }
-
-            if (subExpressao.size() > 1) {
-                TirarColchetesFora(&subExpressao);
-
-                int subIndice = 0;
-                EConectivo subConectivo = ParsearExpressao(subExpressao, &subIndice);
-
-                switch (subConectivo) {
-                    case ENADA: {
-
-                        subExpressao.insert(subExpressao.begin(), L'~');
-                        expressaoAAdicionar.insert(expressaoAAdicionar.end(), subExpressao);
-                        expressaoARemover.insert(expressaoARemover.end(), expressao);
-
-                        std::wcout << "Retirando Colchetes de " << expressao << std::endl;
-                    }
-                              break;
-                    case ENAO: {
-                        std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 4);
-
-                        for (std::wstring novaExpressao : regraAplicada) {
-                            TirarColchetesFora(&novaExpressao);
-                            expressaoAAdicionar.insert(expressaoAAdicionar.end(), novaExpressao);
-                        }
-
-                        expressaoARemover.insert(expressaoARemover.end(), expressao);
-
-                        std::wcout << "Aplicando regra 4 em " << expressao << std::endl;
-                    }
-                             break;
-
-                    case EIMPLICA: {
-                        std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 7);
-
-
-                        for (std::wstring novaExpressao : regraAplicada) {
-                            TirarColchetesFora(&novaExpressao);
-                            expressaoAAdicionar.insert(expressaoAAdicionar.end(), novaExpressao);
-                        }
-
-                        expressaoARemover.insert(expressaoARemover.end(), expressao);
-
-                        std::wcout << "Aplicando regra 7 em " << expressao << std::endl;
-                    }
-                                 break;
-
-                    case EOU: {
-                        std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 6);
-
-                        for (std::wstring novaExpressao : regraAplicada) {
-                            TirarColchetesFora(&novaExpressao);
-                            expressaoAAdicionar.insert(expressaoAAdicionar.end(), novaExpressao);
-                        }
-
-                        expressaoARemover.insert(expressaoARemover.end(), expressao);
-
-                        std::wcout << "Aplicando regra 6 em " << expressao << std::endl;
-                    }
-                            break;
-
-                    case EE: {
-                        std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 5);
-
-
-                        TirarColchetesFora(&regraAplicada[0]);
-                        expressaoAAdicionar.insert(expressaoAAdicionar.end(), regraAplicada[0]);
-                        expressaoARemover.insert(expressaoARemover.end(), expressao);
-
-                        TirarColchetesFora(&regraAplicada[1]);
-                        expressaoAAdicionarNovoGalho = regraAplicada[1];
-
-                        std::wcout << "Aplicando regra 5 em " << expressao << std::endl;
-
-                    }
-
-                           break;
-                    }
-
-            }
         }
+
+        if (subExpressao.size() > 1) {
+            TirarColchetesFora(&subExpressao);
+
+            int subIndice = 0;
+            EConectivo subConectivo = ParsearExpressao(subExpressao, &subIndice);
+
+            switch (subConectivo) {
+            case ENADA: {
+
+                subExpressao.insert(subExpressao.begin(), L'~');
+                expressaoAAdicionar.insert(expressaoAAdicionar.end(), subExpressao);
+                expressaoARemover.insert(expressaoARemover.end(), expressao);
+
+                std::wcout << "Retirando Colchetes de " << expressao << std::endl;
+            }
+                      break;
+            case ENAO: {
+                std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 4);
+
+                for (std::wstring novaExpressao : regraAplicada) {
+                    TirarColchetesFora(&novaExpressao);
+                    expressaoAAdicionar.insert(expressaoAAdicionar.end(), novaExpressao);
+                }
+
+                expressaoARemover.insert(expressaoARemover.end(), expressao);
+
+                std::wcout << "Aplicando regra 4 em " << expressao << std::endl;
+            }
+                     break;
+
+            case EIMPLICA: {
+                std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 7);
+
+
+                for (std::wstring novaExpressao : regraAplicada) {
+                    TirarColchetesFora(&novaExpressao);
+                    expressaoAAdicionar.insert(expressaoAAdicionar.end(), novaExpressao);
+                }
+
+                expressaoARemover.insert(expressaoARemover.end(), expressao);
+
+                std::wcout << "Aplicando regra 7 em " << expressao << std::endl;
+            }
+                         break;
+
+            case EOU: {
+                std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 6);
+
+                for (std::wstring novaExpressao : regraAplicada) {
+                    TirarColchetesFora(&novaExpressao);
+                    expressaoAAdicionar.insert(expressaoAAdicionar.end(), novaExpressao);
+                }
+
+                expressaoARemover.insert(expressaoARemover.end(), expressao);
+
+                std::wcout << "Aplicando regra 6 em " << expressao << std::endl;
+            }
+                    break;
+
+            case EE: {
+                std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 5);
+
+
+                TirarColchetesFora(&regraAplicada[0]);
+                expressaoAAdicionar.insert(expressaoAAdicionar.end(), regraAplicada[0]);
+                expressaoARemover.insert(expressaoARemover.end(), expressao);
+
+                TirarColchetesFora(&regraAplicada[1]);
+                expressaoAAdicionarNovoGalho = regraAplicada[1];
+
+                std::wcout << "Aplicando regra 5 em " << expressao << std::endl;
+
+            }
+
+                   break;
+
+                   // (~@A) -> Existe Negado (#A ~)
+            case ETODO: {
+                std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 8);
+                TirarColchetesFora(&regraAplicada[0]);
+                expressaoAAdicionar.insert(expressaoAAdicionar.end(), regraAplicada[0]);
+                expressaoARemover.insert(expressaoARemover.end(), expressao);
+                std::wcout << "Aplicando regra de Negacao de Para Todo em " << expressao << std::endl;
+            }
+                      break;
+
+                      // (~#A) -> Todo Negado (@A ~)
+            case EALGUM: {
+                std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 9);
+                TirarColchetesFora(&regraAplicada[0]);
+                expressaoAAdicionar.insert(expressaoAAdicionar.end(), regraAplicada[0]);
+                expressaoARemover.insert(expressaoARemover.end(), expressao);
+                std::wcout << "Aplicando regra de Negacao de Existe em " << expressao << std::endl;
+            }
+                       break;
+
+            }
+
+        }
+    }
+             break;
+
+    case EIMPLICA: {
+        std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 3);
+
+        TirarColchetesFora(&regraAplicada[0]);
+        expressaoAAdicionar.insert(expressaoAAdicionar.end(), regraAplicada[0]);
+        expressaoARemover.insert(expressaoARemover.end(), expressao);
+
+        TirarColchetesFora(&regraAplicada[1]);
+        expressaoAAdicionarNovoGalho = regraAplicada[1];
+
+        std::wcout << "Aplicando regra 3 em " << expressao << std::endl;
+    }
                  break;
 
-        case EIMPLICA: {
-            std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 3);
 
-            TirarColchetesFora(&regraAplicada[0]);
-            expressaoAAdicionar.insert(expressaoAAdicionar.end(), regraAplicada[0]);
-            expressaoARemover.insert(expressaoARemover.end(), expressao);
 
-            TirarColchetesFora(&regraAplicada[1]);
-            expressaoAAdicionarNovoGalho = regraAplicada[1];
- 
-            std::wcout << "Aplicando regra 3 em " << expressao << std::endl;
-        }
+    case EOU: {
+        std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 2);
+
+        TirarColchetesFora(&regraAplicada[0]);
+        expressaoAAdicionar.insert(expressaoAAdicionar.end(), regraAplicada[0]);
+        expressaoARemover.insert(expressaoARemover.end(), expressao);
+
+        TirarColchetesFora(&regraAplicada[1]);
+        expressaoAAdicionarNovoGalho = regraAplicada[1];
+
+        std::wcout << "Aplicando regra 2 em " << expressao << std::endl;
+    }
             break;
 
 
+    case EE: {
 
-        case EOU: {
-            std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 2);
+        std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 1);
 
-            TirarColchetesFora(&regraAplicada[0]);
-            expressaoAAdicionar.insert(expressaoAAdicionar.end(), regraAplicada[0]);
-            expressaoARemover.insert(expressaoARemover.end(), expressao);
-
-            TirarColchetesFora(&regraAplicada[1]);
-            expressaoAAdicionarNovoGalho = regraAplicada[1];
-
-            std::wcout << "Aplicando regra 2 em " << expressao << std::endl;
-        }
-            break;
-
-
-        case EE: {
-
-            std::vector <std::wstring> regraAplicada = AplicarRegra(expressao, 1);
-
-            for (std::wstring novaExpressao : regraAplicada) {
-                TirarColchetesFora(&novaExpressao);
-                expressaoAAdicionar.insert(expressaoAAdicionar.end(), novaExpressao);
-            }
-
-            expressaoARemover.insert(expressaoARemover.end(), expressao);
-
-            std::wcout << "Aplicando regra 1 em " << expressao << std::endl;
-
+        for (std::wstring novaExpressao : regraAplicada) {
+            TirarColchetesFora(&novaExpressao);
+            expressaoAAdicionar.insert(expressaoAAdicionar.end(), novaExpressao);
         }
 
-            break;
+        expressaoARemover.insert(expressaoARemover.end(), expressao);
+
+        std::wcout << "Aplicando regra 1 em " << expressao << std::endl;
+
+    }
+
+           break;
+
+           // Adicionado: Resolução de Para Todo (@)
+    case ETODO: {
+        // X(Formula)
+
+        wchar_t boundVar = expressao[indice + 1];
+        std::wstring subExpressao = expressao.substr(indice + 2); // Pula @ e Var
+        TirarColchetesFora(&subExpressao);
+
+        std::wstring instanciada = SubstituirVariavel(subExpressao, boundVar, L'a');
+
+        expressaoAAdicionar.insert(expressaoAAdicionar.end(), instanciada);
+        expressaoARemover.insert(expressaoARemover.end(), expressao);
+
+        std::wcout << "Instanciando Para Todo " << boundVar << " -> 'a' em " << expressao << std::endl;
+    }
+              break;
+
+
+    case EALGUM: {
+        // #X(Formula)
+        wchar_t boundVar = expressao[indice + 1];
+        std::wstring subExpressao = expressao.substr(indice + 2);
+        TirarColchetesFora(&subExpressao);
+
+        std::wstring instanciada = SubstituirVariavel(subExpressao, boundVar, L'a');
+
+        expressaoAAdicionar.insert(expressaoAAdicionar.end(), instanciada);
+        expressaoARemover.insert(expressaoARemover.end(), expressao);
+
+        std::wcout << "Instanciando Existe " << boundVar << " -> 'a' em " << expressao << std::endl;
+    }
+               break;
 
     }
 
@@ -590,7 +665,7 @@ bool ResolverExpressao(std::wstring expressao, int indice, EConectivo conectivo,
 
         }
         std::wcout << " ------- " << std::endl;
-        
+
         if (expressaoAAdicionarNovoGalho.size() > 0) {
 
             std::vector <std::wstring> novoGalho = *galho;
@@ -882,7 +957,7 @@ std::vector <std::wstring> AplicarRegra(std::wstring expressao, int regra) {
 
         for (int i = 0; i < subExpressao.size(); i++) {
 
-            
+
 
             if (subExpressao[i] == L'(') {
                 colchetesAbertos++;
@@ -921,7 +996,8 @@ std::vector <std::wstring> AplicarRegra(std::wstring expressao, int regra) {
         break;
 
     }
-    case 7:   int noti = expressao.find_first_of('~');
+    case 7: {
+        int noti = expressao.find_first_of('~');
 
         // ((~(A>B)))
 
@@ -974,25 +1050,57 @@ std::vector <std::wstring> AplicarRegra(std::wstring expressao, int regra) {
         break;
 
     }
+          // Negação de Para Todo (~@X A) -> (#X ~A)
+    case 8: {
+        int noti = expressao.find_first_of('~');
+        std::wstring subExpressao; // contem @X(Formula)
+
+        for (int i = noti + 1; i < expressao.size(); i++) {
+            subExpressao += expressao[i];
+        }
+        TirarColchetesFora(&subExpressao);
 
 
-    return expressaoFinal;
+        wchar_t variavel = subExpressao[1];
+        std::wstring corpo = subExpressao.substr(2);
+
+        alfa += L'#';
+        alfa += variavel;
+        alfa += L"(~";
+        alfa += corpo;
+        alfa += L")";
+
+        expressaoFinal.insert(expressaoFinal.end(), alfa);
+        break;
+    }
+          // Negação de Existe (~#X A) -> (@X ~A)
+    case 9: {
+        int noti = expressao.find_first_of('~');
+        std::wstring subExpressao;
+
+        for (int i = noti + 1; i < expressao.size(); i++) {
+            subExpressao += expressao[i];
+        }
+        TirarColchetesFora(&subExpressao);
+
+        wchar_t variavel = subExpressao[1];
+        std::wstring corpo = subExpressao.substr(2);
+
+        alfa += L'@';
+        alfa += variavel;
+        alfa += L"(~";
+        alfa += corpo;
+        alfa += L")";
+
+        expressaoFinal.insert(expressaoFinal.end(), alfa);
+        break;
+    }
+
+
+          return expressaoFinal;
+    }
+
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

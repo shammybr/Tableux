@@ -1,6 +1,9 @@
 ﻿  Logica.cpp
 C:\Users\Shamm\Desktop\Ryan\Prog1\Tableaux\Logica.cpp(1,1): warning C4819: The file contains a character that cannot be represented in the current code page (932). Save the file in Unicode format to prevent data loss
-C:\Users\Shamm\Desktop\Ryan\Prog1\Tableaux\Logica.cpp(815,18): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\Shamm\Desktop\Ryan\Prog1\Tableaux\Logica.cpp(870,18): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\Shamm\Desktop\Ryan\Prog1\Tableaux\Logica.cpp(924,24): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\Shamm\Desktop\Ryan\Prog1\Tableaux\Logica.cpp(890,18): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\Shamm\Desktop\Ryan\Prog1\Tableaux\Logica.cpp(945,18): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\Shamm\Desktop\Ryan\Prog1\Tableaux\Logica.cpp(1000,18): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\Shamm\Desktop\Ryan\Prog1\Tableaux\Logica.cpp(1055,18): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\Shamm\Desktop\Ryan\Prog1\Tableaux\Logica.cpp(1078,18): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\Shamm\Desktop\Ryan\Prog1\Tableaux\Logica.cpp(1103,1): warning C4715: 'AplicarRegra': not all control paths return a value
   Logica.vcxproj -> C:\Users\Shamm\Desktop\Ryan\Prog1\Tableaux\x64\Debug\Logica.exe
